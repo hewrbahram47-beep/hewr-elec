@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electricity Bill</title>
+<style>
+body{
+    margin:0;
+    font-family:'Segoe UI', sans-serif;
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    color:#333;
+}
+.container{
+    background:white;
+    width:450px;
+    padding:35px;
+    border-radius:25px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    transition:0.3s;
+    position:relative;
+    overflow:hidden;
+}
+.dark{background:#1e1e2f;color:white;}
+h2{text-align:center;margin-bottom:15px;}
+.subtitle{text-align:center;font-size:14px;opacity:0.7;margin-bottom:20px;}
+input{width:100%;padding:14px;margin:10px 0;border-radius:12px;border:1px solid #ccc;font-size:15px;outline:none;}
+body.dark input{background:#2c2c3c;color:white;border:none;}
+button{width:100%;padding:14px;margin-top:12px;border:none;border-radius:12px;cursor:pointer;font-size:15px;transition:0.3s;}
+button:hover{opacity:0.85;}
+.calc-btn{background:#28a745;color:white;}
+.info-btn{background:#007bff;color:white;}
+.lang-btn{background:#6c757d;color:white;margin-top:5px;}
+.back-btn{background:#dc3545;color:white;}
+.receipt-box, .info-box{position:absolute;top:0;left:0;width:100%;height:100%;background:#f4f4f4;border-radius:25px;padding:25px;font-size:14px;overflow-y:auto;box-sizing:border-box;transform:translateY(100%);opacity:0;transition:all 0.5s ease;z-index:10;}
+.dark .receipt-box, .dark .info-box{background:#2c2c3c;color:white;}
+.receipt-box.show, .info-box.show{transform:translateY(0);opacity:1;}
+.top-buttons{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.mode-btn{position:absolute;top:15px;right:15px;background: linear-gradient(135deg,#5a67d8,#764ba2);color:white;border-radius:50px;width:50px;height:50px;border:none;font-size:20px;display:flex;justify-content:center;align-items:center;box-shadow:0 5px 15px rgba(0,0,0,0.3);cursor:pointer;transition:0.3s;}
+.mode-btn:hover{transform: scale(1.1);}
+.info-box table{width:100%;border-collapse:collapse;margin-top:10px;}
+.info-box table, .info-box th, .info-box td{border:1px solid #ccc;padding:8px;text-align:center;}
+.dark .info-box table, .dark .info-box th, .dark .info-box td{border-color:#555;}
+
+/* Receipt Styles */
+.receipt-box h3{margin-bottom:10px;text-align:center;}
+.receipt-box table{width:100%;border-collapse:collapse;margin-top:10px;}
+.receipt-box table, .receipt-box th, .receipt-box td{border:1px solid #ccc;padding:8px;text-align:center;}
+.receipt-box th{background:#667eea;color:white;}
+.receipt-box .total-row th, .receipt-box .total-row td{background:#28a745;color:white;font-weight:bold;}
+.receipt-box p{margin:5px 0;}
+.receipt-box small{opacity:0.7;}
+.receipt-buttons{display:flex;gap:10px;margin-top:15px;justify-content:center;}
+
+/* Print Styles */
+@media print{
+    body *{visibility:hidden;}
+    #receipt, #receipt *{visibility:visible;}
+    #receipt{position:static; width:100%; height:auto; background:white; padding:20px;}
+    .back-btn, .calc-btn{display:none;}
+}
+</style>
+</head>
+<body>
+<div class="container" id="mainBox">
+<button class="mode-btn" id="darkBtn" onclick="toggleMode()">🌙</button>
+<h2 id="title">Electricity Bill</h2>
+<div class="subtitle" id="subtitle">Monthly Consumption Calculator</div>
+
+<div class="top-buttons">
+<button class="lang-btn" onclick="setLang('en')">English</button>
+<button class="lang-btn" onclick="setLang('ku')">کوردی</button>
+</div>
+
+<input type="text" id="name" placeholder="Customer Name">
+<input type="text" id="house" placeholder="House Number">
+<input type="number" id="units" placeholder="Electricity Units (kWh)" min="0">
+
+<button class="calc-btn" onclick="calculate()">Calculate</button>
+<button class="info-btn" onclick="showInfo()">Info</button>
+
+<div class="receipt-box" id="receipt"></div>
+
+<div class="info-box" id="infoBox">
+    <h3 id="infoTitle">Electricity Pricing</h3>
+    <p id="infoText">The electricity bill is calculated based on tiered pricing:</p>
+    <table>
+        <tr>
+            <th id="tier1Label">Units</th>
+            <th id="priceLabel">Price per Unit</th>
+        </tr>
+        <tr><td>0 - 1000 kWh</td><td>100 IQD</td></tr>
+        <tr><td>1001 - 2000 kWh</td><td>150 IQD</td></tr>
+        <tr><td>Above 2000 kWh</td><td>200 IQD</td></tr>
+    </table>
+    <p id="infoFormula">Formula: Total = Units × Price (tiered)</p>
+    <button class="back-btn" onclick="hideInfo()">Back</button>
+</div>
+</div>
+
+<script>
+let language='en';
+const unitPrices=[{max:1000,price:100},{max:2000,price:150},{max:Infinity,price:200}];
+
+function setLang(lang){
+    language=lang;
+    if(lang==='ku'){
+        document.getElementById('title').innerText='ژمێریاری کارەبا';
+        document.getElementById('subtitle').innerText='ژمێریاری بەکارهێنانی مانگی کارەبا';
+        document.getElementById('name').placeholder='ناوی هاوبەش';
+        document.getElementById('house').placeholder='ژمارەی ماڵ';
+        document.getElementById('units').placeholder='یەکەی کارەبا (kWh)';
+        document.getElementById('infoTitle').innerText='نرخی کارەبا';
+        document.getElementById('infoText').innerText='ژمێریاری مانگی کارەبا بە شێوەی پلەیەتی ئەنجام دەدرێت:';
+        document.getElementById('tier1Label').innerText='یەکەکان';
+        document.getElementById('priceLabel').innerText='نرخی یەکە';
+        document.getElementById('infoFormula').innerText='فۆرمولا: کۆی گشتی = یەکە × نرخ (پلەیەتی)';
+    }else{
+        document.getElementById('title').innerText='Electricity Bill';
+        document.getElementById('subtitle').innerText='Monthly Consumption Calculator';
+        document.getElementById('name').placeholder='Customer Name';
+        document.getElementById('house').placeholder='House Number';
+        document.getElementById('units').placeholder='Electricity Units (kWh)';
+        document.getElementById('infoTitle').innerText='Electricity Pricing';
+        document.getElementById('infoText').innerText='The electricity bill is calculated based on tiered pricing:';
+        document.getElementById('tier1Label').innerText='Units';
+        document.getElementById('priceLabel').innerText='Price per Unit';
+        document.getElementById('infoFormula').innerText='Formula: Total = Units × Price (tiered)';
+    }
+}
+
+function toggleMode(){
+    const box=document.getElementById('mainBox');
+    box.classList.toggle('dark');
+    const btn=document.getElementById('darkBtn');
+    btn.innerText = btn.innerText==='🌙'?'☀️':'🌙';
+}
+
+function calculate(){
+    let name=document.getElementById('name').value.trim();
+    let house=document.getElementById('house').value.trim();
+    let units=parseFloat(document.getElementById('units').value);
+    if(!name || !house || isNaN(units) || units<=0){
+        alert(language==='ku'?'تکایە هەموو زانیاریەکان پڕبکە':'Please fill all fields with valid numbers');
+        return;
+    }
+
+    let total=0, breakdownRows='', remaining=units, prevMax=0;
+    for(let tier of unitPrices){
+        let used=Math.min(tier.max-prevMax,remaining);
+        if(used>0){
+            total+=used*tier.price;
+            breakdownRows+=`<tr><td>${used} kWh</td><td>${tier.price} IQD</td><td>${(used*tier.price).toLocaleString()} IQD</td></tr>`;
+            remaining-=used;
+            prevMax=tier.max;
+        }
+    }
+
+    let now=new Date().toLocaleString();
+    let receipt=document.getElementById('receipt');
+    receipt.classList.add('show');
+
+    if(language==='ku'){
+        receipt.innerHTML=`
+        <h3>🧾 پەیامنامەی پارەدان</h3>
+        <p><b>ناو:</b> ${name}</p>
+        <p><b>ژمارەی ماڵ:</b> ${house}</p>
+        <p><b>بەکارهێنانی کارەبا:</b> ${units} kWh</p>
+        <table>
+            <tr><th>یەکە</th><th>نرخی یەکە</th><th>کۆی گشتی</th></tr>
+            ${breakdownRows}
+            <tr class="total-row"><th colspan="2">کۆی گشتی</th><td>${total.toLocaleString()} دینار</td></tr>
+        </table>
+        <p><small>کات: ${now}</small></p>
+        <div class="receipt-buttons">
+            <button class="back-btn" onclick="hideReceipt()">گەڕانەوە</button>
+            <button class="calc-btn" onclick="printReceipt()">پرنت</button>
+        </div>`;
+    }else{
+        receipt.innerHTML=`
+        <h3>🧾 Payment Receipt</h3>
+        <p><b>Name:</b> ${name}</p>
+        <p><b>House No:</b> ${house}</p>
+        <p><b>Electricity Used:</b> ${units} kWh</p>
+        <table>
+            <tr><th>Units</th><th>Price</th><th>Subtotal</th></tr>
+            ${breakdownRows}
+            <tr class="total-row"><th colspan="2">Total</th><td>${total.toLocaleString()} IQD</td></tr>
+        </table>
+        <p><small>Date: ${now}</small></p>
+        <div class="receipt-buttons">
+            <button class="back-btn" onclick="hideReceipt()">Back</button>
+            <button class="calc-btn" onclick="printReceipt()">Print</button>
+        </div>`;
+    }
+}
+
+function hideReceipt(){document.getElementById('receipt').classList.remove('show');}
+function showInfo(){document.getElementById('infoBox').classList.add('show');}
+function hideInfo(){document.getElementById('infoBox').classList.remove('show');}
+function printReceipt(){window.print();}
+</script>
+</body>
+</html>
